@@ -136,28 +136,30 @@
         .main-content {
             flex: 1;
             padding: 20px;
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
         
         .filter-container {
             background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
         }
         
         .search-container {
-            margin-bottom: 20px;
+            margin-bottom: 0;
+            flex: 1;
+            min-width: 200px;
         }
         
         .search-input {
             width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
             transition: border-color 0.2s ease;
         }
         
@@ -169,39 +171,40 @@
         .filter-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 20px;
-            align-items: flex-end;
-            justify-content: center; /* 居中对齐 */
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
         }
         
         .filter-group {
             display: flex;
-            flex-direction: column;
-            gap: 8px;
-            min-width: 200px;
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
         }
         
         .filter-group label {
             font-weight: 500;
             color: #333;
-            font-size: 14px;
+            font-size: 13px;
+            margin: 0;
+            white-space: nowrap;
         }
         
         .time-filter-buttons {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center; /* 按钮组居中 */
+            gap: 4px;
         }
         
         .time-filter-btn {
-            padding: 8px 16px;
+            padding: 4px 8px;
             border: 1px solid #e0e0e0;
             background-color: white;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 14px;
+            font-size: 12px;
         }
         
         .time-filter-btn:hover {
@@ -214,26 +217,26 @@
             border-color: #1976d2;
         }
         
-        select, input[type="date"] {
-            padding: 8px 12px;
+        select {
+            padding: 4px 6px;
             border: 1px solid #e0e0e0;
-            border-radius: 6px;
+            border-radius: 4px;
             background-color: white;
-            font-size: 14px;
+            font-size: 12px;
         }
         
         .filter-buttons {
             display: flex;
-            gap: 10px;
+            gap: 6px;
         }
         
         .filter-btn {
-            padding: 8px 16px;
+            padding: 4px 8px;
             border: none;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 500;
         }
         
@@ -256,11 +259,12 @@
         }
         
         .filter-stats {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
+            margin: 0;
+            padding: 0;
+            border: none;
             color: #666;
-            font-size: 14px;
+            font-size: 12px;
+            white-space: nowrap;
         }
         
         .container {
@@ -289,7 +293,7 @@
         }
         
         .paper-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: #333;
             margin-bottom: 12px;
@@ -471,6 +475,28 @@
             background-color: #d32f2f;
         }
         
+        #custom-date-row {
+            display: flex;
+            flex-direction: row !important;
+            align-items: center;
+            gap: 15px;
+            margin-top: 8px;
+        }
+        
+        #custom-date-row .filter-group {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+            min-width: auto !important;
+            margin: 0;
+        }
+        
+        #custom-date-row input[type="date"] {
+            width: 140px;
+            min-width: 140px;
+        }
+        
         @media (max-width: 992px) {
             body {
                 padding-left: 0;
@@ -550,37 +576,29 @@
     <!-- 主要内容区域 -->
     <div class="main-content">
         <div class="filter-container">
-            <div class="search-container">
-                <input type="text" id="search-input" class="search-input" placeholder="搜索论文标题、关键词或摘要...">
-            </div>
             <div class="filter-row">
+                <div class="search-container">
+                    <input type="text" id="search-input" class="search-input" placeholder="搜索论文标题、关键词或摘要...">
+                </div>
                 <div class="filter-group">
                     <div class="time-filter-buttons" id="time-filter-buttons">
-                        <button class="time-filter-btn active" data-value="all">全部时间</button>
+                        <button class="time-filter-btn active" data-value="all">全部</button>
                         <button class="time-filter-btn" data-value="today">今天</button>
                         <button class="time-filter-btn" data-value="week">本周</button>
                         <button class="time-filter-btn" data-value="month">本月</button>
+                        <button class="time-filter-btn" data-value="halfyear">半年</button>
                         <button class="time-filter-btn" data-value="year">今年</button>
-                        <button class="time-filter-btn" data-value="2years">最近2年</button>
-                        <button class="time-filter-btn" data-value="3years">最近3年</button>
-                        <button class="time-filter-btn" data-value="5years">最近5年</button>
-                        <button class="time-filter-btn" data-value="custom">自定义范围</button>
+                        <button class="time-filter-btn" data-value="2years">2年</button>
+                        <button class="time-filter-btn" data-value="3years">3年</button>
+                        <button class="time-filter-btn" data-value="5years">5年</button>
                     </div>
                 </div>
-                <div class="filter-group" id="custom-date-range" style="display: none;">
-                    <label for="start-date">开始日期</label>
-                    <input type="date" id="start-date">
+                <div class="filter-stats">
+                    共 <span id="papers-count">0</span> 篇
                 </div>
-                <div class="filter-group" id="custom-date-end" style="display: none;">
-                    <label for="end-date">结束日期</label>
-                    <input type="date" id="end-date">
-                </div>
-            </div>
-            <div class="filter-stats">
-                共找到 <span id="papers-count">0</span> 篇论文
             </div>
         </div>
-        
+
         <div class="container" id="papers-container"></div>
     </div>
 
@@ -600,10 +618,12 @@
             const closeModal = document.getElementById('close-modal');
             const readPapers = new Set();
             const timeFilterButtons = document.getElementById('time-filter-buttons');
-            const customDateRange = document.getElementById('custom-date-range');
-            const customDateEnd = document.getElementById('custom-date-end');
-            const startDate = document.getElementById('start-date');
-            const endDate = document.getElementById('end-date');
+            // 移除不存在的DOM元素引用
+            // const customDateRange = document.getElementById('custom-date-range');
+            // const customDateEnd = document.getElementById('custom-date-end');
+            // const customDateRow = document.getElementById('custom-date-row');
+            // const startDate = document.getElementById('start-date');
+            // const endDate = document.getElementById('end-date');
             const sidebarTagsContainer = document.getElementById('sidebar-tags-container');
             const papersCount = document.getElementById('papers-count');
             const searchInput = document.getElementById('search-input');
@@ -961,6 +981,12 @@
                         endDateValue = new Date(today.getFullYear(), today.getMonth() + 1, 0);
                         endDateValue.setHours(23, 59, 59, 999);
                         break;
+                    case 'halfyear':
+                        startDateValue = new Date(today);
+                        startDateValue.setMonth(today.getMonth() - 6);
+                        endDateValue = new Date(today);
+                        endDateValue.setHours(23, 59, 59, 999);
+                        break;
                     case 'year':
                         startDateValue = new Date(today.getFullYear(), 0, 1);
                         endDateValue = new Date(today.getFullYear(), 11, 31);
@@ -979,14 +1005,6 @@
                     case '5years':
                         startDateValue = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
                         endDateValue = new Date(today);
-                        endDateValue.setHours(23, 59, 59, 999);
-                        break;
-                    case 'custom':
-                        if (!startDate.value || !endDate.value) {
-                            return papers;
-                        }
-                        startDateValue = new Date(startDate.value);
-                        endDateValue = new Date(endDate.value);
                         endDateValue.setHours(23, 59, 59, 999);
                         break;
                     default:
@@ -1070,20 +1088,22 @@
                     });
                     e.target.classList.add('active');
                     
-                    if (value === 'custom') {
-                        customDateRange.style.display = 'block';
-                        customDateEnd.style.display = 'block';
-                    } else {
-                        customDateRange.style.display = 'none';
-                        customDateEnd.style.display = 'none';
-                    }
+                    // 移除不存在的自定义日期显示/隐藏逻辑
+                    // if (value === 'custom') {
+                    //     customDateRange.style.display = 'block';
+                    //     customDateEnd.style.display = 'block';
+                    // } else {
+                    //     customDateRange.style.display = 'none';
+                    //     customDateEnd.style.display = 'none';
+                    // }
                     
                     applyAllFilters();
                 }
             });
 
-            startDate.addEventListener('change', applyAllFilters);
-            endDate.addEventListener('change', applyAllFilters);
+            // 移除不存在的日期输入框事件监听器
+            // startDate.addEventListener('change', applyAllFilters);
+            // endDate.addEventListener('change', applyAllFilters);
             searchInput.addEventListener('input', applyAllFilters);
             
             // 初始化
