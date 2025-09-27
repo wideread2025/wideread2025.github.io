@@ -764,9 +764,9 @@
                         meta.appendChild(journal);
                     }
                     
-                    if (paper.online_date || paper.publish_date) {
+                    if (paper.date) {
                         const date = document.createElement('span');
-                        date.textContent = paper.online_date || paper.publish_date;
+                        date.textContent = paper.date;
                         meta.appendChild(date);
                     }
                     
@@ -836,7 +836,7 @@
             function displayDetails(paper, index) {
                 modalDetails.innerHTML = `
                     <h2><a href="${paper.url || '#'}\" target="_blank\" rel=\"noopener\">${paper.title || '无标题'}</a></h2>
-                    <p><strong>期刊/日期/作者:</strong> ${paper.journal || '未知'} · ${paper.online_date || paper.publish_date || '未知'} · ${paper.authors ? (Array.isArray(paper.authors) ? (paper.authors.length > 0 ? paper.authors.join(', ') : '未知') : (typeof paper.authors === 'string' ? paper.authors : '未知')) : '未知'}</p>
+                    <p><strong>期刊/日期/作者:</strong> ${paper.journal || '未知'} · ${paper.date || '未知'} · ${paper.authors ? (Array.isArray(paper.authors) ? (paper.authors.length > 0 ? paper.authors.join(', ') : '未知') : (typeof paper.authors === 'string' ? paper.authors : '未知')) : '未知'}</p>
                     <p>
                         ${paper.doi ? `<strong>DOI:</strong> <a href=\"https://doi.org/${paper.doi}\" target=\"_blank\" rel=\"noopener\">${paper.doi}</a>` : ""}
                         ${paper.doi && paper.pdf_link ? ` · ` : ""}
@@ -1012,9 +1012,9 @@
                 }
                 
                 return papers.filter(paper => {
-                    if (!paper.online_date && !paper.publish_date) return true;
+                    if (!paper.date) return true;
                     
-                    const paperDateStr = paper.online_date || paper.publish_date;
+                    const paperDateStr = paper.date;
                     let paperDate;
                     
                     try {
