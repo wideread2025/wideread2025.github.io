@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>论文筛选系统</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- 添加pako库用于GZIP解压缩 -->
-    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 
 
     <style>
@@ -716,55 +714,14 @@
                         return papers;
                     });
                 } else {
-                    // 对于GitHub Pages，需要手动处理GZIP解压缩
-                    const gzipUrl = jsonUrl.endsWith('.json') ? jsonUrl + '.gz' : jsonUrl;
-                    
-                    return fetch(gzipUrl)
+                    return fetch(jsonUrl)
                     .then(response => {
-                        if (!response.ok) {
-                            // 如果.gz文件不存在，回退到原始JSON文件
-                            if (response.status === 404 && gzipUrl.endsWith('.gz')) {
-                                return fetch(jsonUrl)
-                                    .then(response => {
-                                        if (!response.ok) throw new Error('无法加载论文数据: ' + response.statusText);
-                                        return response.json();
-                                    });
-                            }
-                            throw new Error('无法加载论文数据: ' + response.statusText);
-                        }
-                        
-                        // GitHub Pages返回的是原始GZIP数据，需要手动解压缩
-                        return response.arrayBuffer()
-                            .then(buffer => {
-                                // 使用pako库进行GZIP解压缩
-                                if (typeof pako === 'undefined') {
-                                    throw new Error('pako库未加载，无法解压缩GZIP文件');
-                                }
-                                
-                                try {
-                                    const decompressed = pako.inflate(new Uint8Array(buffer), { to: 'string' });
-                                    return JSON.parse(decompressed);
-                                } catch (e) {
-                                    throw new Error('GZIP解压缩失败: ' + e.message);
-                                }
-                            });
+                        if (!response.ok) throw new Error('无法加载论文数据: ' + response.statusText);
+                        return response.json();
                     })
                     .then(papers => {
                         if (!Array.isArray(papers)) throw new Error('论文数据格式不正确');
                         return papers;
-                    })
-                    .catch(error => {
-                        console.warn('GZIP加载失败，尝试原始JSON:', error);
-                        // 回退到原始JSON文件
-                        return fetch(jsonUrl)
-                            .then(response => {
-                                if (!response.ok) throw new Error('无法加载论文数据: ' + response.statusText);
-                                return response.json();
-                            })
-                            .then(papers => {
-                                if (!Array.isArray(papers)) throw new Error('论文数据格式不正确');
-                                return papers;
-                            });
                     });
                 }
             }
