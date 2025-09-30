@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wideread</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 添加pako库用于GZIP解压缩 -->
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background-color: #f5f5f5;
+        transition: padding-left 0.3s ease;
+        padding-left: 60px; /* 为侧边栏图标留出空间 */
+      }
+
+      .app-container {
+        display: flex;
+        min-height: 100vh;
+      }
+
+      .sidebar-container {
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .sidebar-icon {
+        width: 50px;
+        height: 50px;
+        background-color: #1976d2;
+        color: white;
+        border-radius: 0 8px 8px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+        position: relative;
+      }
+
+      .sidebar-icon:hover {
+        background-color: #1565c0;
+        transform: translateX(5px);
+      }
+
+      .tags-sidebar {
+        position: fixed;
+        left: -400px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 380px;
+        max-height: 70vh;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        padding: 20px;
+        transition: left 0.3s ease;
+        z-index: 999;
+        overflow-y: auto;
+      }
+
+      .tags-sidebar.active {
+        left: 70px;
+      }
+
+      .journal-sidebar {
+        position: fixed;
+        left: -400px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 350px;
+        max-height: 60vh;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        padding: 20px;
+        transition: left 0.3s ease;
+        z-index: 998;
+        overflow-y: auto;
+      }
+
+      .journal-sidebar.active {
+        left: 70px;
+      }
+
+      .sidebar-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 15px;
+      }
+
+      .sidebar-tag-item {
+        flex: 0 0 calc(33.333% - 6px); /* 每行3个 */
+        background-color: #f0f0f0;
+        padding: 6px 8px;
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 26px;
+      }
+
+      .sidebar-tag-item:hover {
+        background-color: #e0e0e0;
+      }
+
+      .sidebar-tag-item.active {
+        background-color: #1976d2;
+        color: white;
+      }
+
+      .tag-count {
+        font-size: 10px;
+        opacity: 0.7;
+        margin-left: 4px;
+      }
+
+      .main-content {
+        flex: 1;
+        padding: 20px;
+        max-width: 1600px;
+        margin: 0 auto;
+      }
+
+      .filter-container {
+        background-color: white;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .search-container {
+        margin-bottom: 0;
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: border-color 0.2s ease;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: #1976d2;
+      }
+
+      .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .filter-group {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .filter-group label {
+        font-weight: 500;
+        color: #333;
+        font-size: 13px;
+        margin: 0;
+        white-space: nowrap;
+      }
+
+      .time-filter-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      .time-filter-btn {
+        padding: 4px 8px;
+        border: 1px solid #e0e0e0;
+        background-color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 12px;
+      }
+
+      .time-filter-btn:hover {
+        background-color: #f5f5f5;
+      }
+
+      .time-filter-btn.active {
+        background-color: #1976d2;
+        color: white;
+        border-color: #1976d2;
+      }
+
+      select {
+        padding: 4px 6px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background-color: white;
+        font-size: 12px;
+      }
+
+      .filter-buttons {
+        display: flex;
+        gap: 6px;
+      }
+
+      .filter-btn {
+        padding: 4px 8px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .filter-btn:not(.secondary) {
+        background-color: #1976d2;
+        color: white;
+      }
+
+      .filter-btn:not(.secondary):hover {
+        background-color: #1565c0;
+      }
+
+      .filter-btn.secondary {
+        background-color: #f0f0f0;
+        color: #333;
+      }
+
+      .filter-btn.secondary:hover {
+        background-color: #e0e0e0;
+      }
+
+      .filter-stats {
+        margin: 0;
+        padding: 0;
+        border: none;
+        color: #666;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+      }
+
+      .paper-card {
+        background-color: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+
+      .paper-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+      }
+
+      .paper-card.read {
+        opacity: 0.7;
+      }
+
+      .paper-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 12px;
+        line-height: 1.4;
+      }
+
+      .paper-translation {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 12px;
+        font-style: italic;
+      }
+
+      .paper-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 14px;
+        color: #666;
+      }
+
+      .paper-meta span {
+        background-color: #f0f0f0;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+
+      .paper-keywords {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+      }
+
+      .keyword-tag {
+        background-color: #e3f2fd;
+        color: #1976d2;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
+
+      .paper-abstract {
+        margin: 15px 0;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        font-size: 14px;
+        color: #555;
+        line-height: 1.6;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+      }
+
+      /* Replace the .modal-content section (lines 550-560) with: */
+      .modal-content {
+        background-color: white;
+        padding: 25px;
+        border-radius: 8px;
+        max-width: 1200px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        margin: 2% auto;
+      }
+
+      /* Replace the .close-btn section (lines 562-570) with: */
+      .close-btn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        font-size: 20px;
+        cursor: pointer;
+        color: #666;
+        transition: color 0.2s;
+      }
+
+      /* Replace the .paper-abstract section (lines 528-538) with: */
+      .paper-abstract {
+        margin: 15px 0;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+      }
+
+      /* Update .details h2, .details p, and add .details strong, .details a sections */
+      .details h2 {
+        color: #202124;
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 1.5em;
+      }
+
+      .details p {
+        margin: 10px 0;
+        line-height: 1.6;
+        font-size: 14px;
+      }
+
+      .details strong {
+        color: #202124;
+      }
+
+      .details a {
+        color: #1967d2;
+        text-decoration: none;
+      }
+
+      .details a:hover {
+        text-decoration: underline;
+      }
+
+      .details .meta {
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #f5f5f5;
+        border-radius: 6px;
+      }
+
+      .details .abstract {
+        margin-bottom: 20px;
+        line-height: 1.8;
+      }
+
+      .details .keywords {
+        margin: 12px 0;
+        flex-wrap: wrap;
+        display: flex;
+        gap: 6px;
+      }
+
+      .details .keyword {
+        display: inline-block;
+        margin: 0.05em 0.2em 0.05em 0;
+        padding: 0.05em 0.4em;
+        border-radius: 1em;
+        background-color: #e3f2fd;
+        color: #1976d2;
+        font-size: 0.85em;
+      }
+
+      .details .tldr {
+        background-color: #e8f5e8;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+      }
+
+      .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
+      .reset-btn {
+        padding: 6px 12px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .reset-btn:hover {
+        background-color: #d32f2f;
+      }
+
+      #custom-date-row {
+        display: flex;
+        flex-direction: row !important;
+        align-items: center;
+        gap: 15px;
+        margin-top: 8px;
+      }
+
+      #custom-date-row .filter-group {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        min-width: auto !important;
+        margin: 0;
+      }
+
+      #custom-date-row input[type="date"] {
+        width: 140px;
+        min-width: 140px;
+      }
+
+      @media (max-width: 992px) {
+        body {
+          padding-left: 0;
+        }
+        .sidebar-container {
+          display: none;
+        }
+        .container {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .filter-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .filter-group {
+          min-width: 100%;
+        }
+        .time-filter-buttons {
+          justify-content: flex-start;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .container {
+          grid-template-columns: 1fr;
+          padding: 10px;
+        }
+        .modal-content {
+          padding: 15px;
+          max-height: 90vh;
+        }
+        .sidebar-tag-item {
+          flex: 0 0 calc(100% - 4px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 侧边栏图标 -->
+    <div class="sidebar-container">
+      <div class="sidebar-icon" id="tags-icon" title="关键词筛选">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+          ></path>
+        </svg>
+      </div>
+      <div class="sidebar-icon" id="journal-icon" title="期刊筛选">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 关键词侧边栏 -->
+    <div class="tags-sidebar" id="tags-sidebar">
+      <div class="sidebar-header">
+        <h3>关键词筛选</h3>
+        <button class="reset-btn" id="reset-tags">重置</button>
+      </div>
+      <div class="sidebar-tags" id="sidebar-tags-container">
+        <!-- 关键词将通过JavaScript动态添加 -->
+      </div>
+    </div>
+
+    <!-- 期刊侧边栏 -->
+    <div class="journal-sidebar" id="journal-sidebar">
+      <div class="sidebar-header">
+        <h3>期刊筛选</h3>
+        <button class="reset-btn" id="reset-journal">重置</button>
+      </div>
+      <select
+        id="journal-filter-sidebar"
+        style="width: 100%; padding: 8px; margin-bottom: 10px"
+      >
+        <option value="all">全部期刊</option>
+      </select>
+      <div id="journal-list"></div>
+    </div>
+
+    <!-- 主要内容区域 -->
+    <div class="main-content">
+      <div class="filter-container">
+        <div class="filter-row">
+          <div class="search-container">
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="搜索论文标题、关键词或摘要..."
+            />
+          </div>
+          <div class="filter-group">
+            <div class="time-filter-buttons" id="time-filter-buttons">
+              <button class="time-filter-btn active" data-value="all">
+                全部
+              </button>
+              <button class="time-filter-btn" data-value="today">今天</button>
+              <button class="time-filter-btn" data-value="week">本周</button>
+              <button class="time-filter-btn" data-value="month">本月</button>
+              <button class="time-filter-btn" data-value="halfyear">
+                半年
+              </button>
+              <button class="time-filter-btn" data-value="year">今年</button>
+              <button class="time-filter-btn" data-value="2years">2年</button>
+              <button class="time-filter-btn" data-value="3years">3年</button>
+              <button class="time-filter-btn" data-value="5years">5年</button>
+            </div>
+          </div>
+          <div class="filter-stats">共 <span id="papers-count">0</span> 篇</div>
+        </div>
+      </div>
+
+      <div class="container" id="papers-container"></div>
+    </div>
+
+    <div class="modal" id="paper-modal">
+      <div class="modal-content">
+        <span class="close-btn" id="close-modal">&times;</span>
+        <div id="modal-details" class="details"></div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const container = document.getElementById("papers-container");
+        const modal = document.getElementById("paper-modal");
+        const modalDetails = document.getElementById("modal-details");
+        const closeModal = document.getElementById("close-modal");
+        const readPapers = new Set();
+        const timeFilterButtons = document.getElementById(
+          "time-filter-buttons",
+        );
+        // 移除不存在的DOM元素引用
+        // const customDateRange = document.getElementById('custom-date-range');
+        // const customDateEnd = document.getElementById('custom-date-end');
+        // const customDateRow = document.getElementById('custom-date-row');
+        // const startDate = document.getElementById('start-date');
+        // const endDate = document.getElementById('end-date');
+        const sidebarTagsContainer = document.getElementById(
+          "sidebar-tags-container",
+        );
+        const papersCount = document.getElementById("papers-count");
+        const searchInput = document.getElementById("search-input");
+        const tagsIcon = document.getElementById("tags-icon");
+        const journalIcon = document.getElementById("journal-icon");
+        const tagsSidebar = document.getElementById("tags-sidebar");
+        const journalSidebar = document.getElementById("journal-sidebar");
+        const resetTagsBtn = document.getElementById("reset-tags");
+        const resetJournalBtn = document.getElementById("reset-journal");
+        const journalFilterSidebar = document.getElementById(
+          "journal-filter-sidebar",
+        );
+        const journalList = document.getElementById("journal-list");
+
+        let allPapers = [];
+        let filteredPapers = [];
+        let selectedTags = new Set();
+        let currentTimeFilter = "all";
+        let selectedJournal = "all";
+
+        // 关闭模态框函数
+        function closePaperModal() {
+          modal.style.display = "none";
+          document.body.style.overflow = "auto";
+        }
+
+        // 关闭按钮事件
+        closeModal.addEventListener("click", closePaperModal);
+
+        // 点击模态框外部关闭
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) closePaperModal();
+        });
+
+        // 尝试从localStorage加载已读状态
+        const savedRead = localStorage.getItem("readPapers");
+        if (savedRead) {
+          JSON.parse(savedRead).forEach((index) => readPapers.add(index));
+        }
+
+        // 侧边栏交互
+        tagsIcon.addEventListener("click", () => {
+          tagsSidebar.classList.toggle("active");
+          journalSidebar.classList.remove("active");
+        });
+
+        journalIcon.addEventListener("click", () => {
+          journalSidebar.classList.toggle("active");
+          tagsSidebar.classList.remove("active");
+        });
+
+        // 点击外部关闭侧边栏
+        document.addEventListener("click", (e) => {
+          if (
+            !e.target.closest(".sidebar-container") &&
+            !e.target.closest(".tags-sidebar") &&
+            !e.target.closest(".journal-sidebar")
+          ) {
+            tagsSidebar.classList.remove("active");
+            journalSidebar.classList.remove("active");
+          }
+        });
+
+        // 重置关键词
+        resetTagsBtn.addEventListener("click", () => {
+          selectedTags.clear();
+          document.querySelectorAll(".sidebar-tag-item").forEach((tag) => {
+            tag.classList.remove("active");
+          });
+          applyAllFilters();
+        });
+
+        // 重置期刊
+        resetJournalBtn.addEventListener("click", () => {
+          selectedJournal = "all";
+          journalFilterSidebar.value = "all";
+          applyAllFilters();
+        });
+
+        // 期刊选择
+        journalFilterSidebar.addEventListener("change", (e) => {
+          selectedJournal = e.target.value;
+          applyAllFilters();
+        });
+
+        // 1. 数据加载函数
+        function loadPapersData(jsonUrl) {
+          if (window.embeddedPapersData) {
+            return Promise.resolve(window.embeddedPapersData).then((papers) => {
+              if (!Array.isArray(papers))
+                throw new Error("嵌入的论文数据格式不正确");
+              return papers;
+            });
+          } else {
+            // 对于GitHub Pages，需要手动处理GZIP解压缩
+            const gzipUrl = jsonUrl.endsWith(".json")
+              ? jsonUrl + ".gz"
+              : jsonUrl;
+
+            return fetch(gzipUrl)
+              .then((response) => {
+                if (!response.ok) {
+                  // 如果.gz文件不存在，回退到原始JSON文件
+                  if (response.status === 404 && gzipUrl.endsWith(".gz")) {
+                    return fetch(jsonUrl).then((response) => {
+                      if (!response.ok)
+                        throw new Error(
+                          "无法加载论文数据: " + response.statusText,
+                        );
+                      return response.json();
+                    });
+                  }
+                  throw new Error("无法加载论文数据: " + response.statusText);
+                }
+
+                // GitHub Pages返回的是原始GZIP数据，需要手动解压缩
+                return response.arrayBuffer().then((buffer) => {
+                  // 使用pako库进行GZIP解压缩
+                  if (typeof pako === "undefined") {
+                    throw new Error("pako库未加载，无法解压缩GZIP文件");
+                  }
+
+                  try {
+                    const decompressed = pako.inflate(new Uint8Array(buffer), {
+                      to: "string",
+                    });
+                    return JSON.parse(decompressed);
+                  } catch (e) {
+                    throw new Error("GZIP解压缩失败: " + e.message);
+                  }
+                });
+              })
+              .then((papers) => {
+                if (!Array.isArray(papers))
+                  throw new Error("论文数据格式不正确");
+                return papers;
+              })
+              .catch((error) => {
+                console.warn("GZIP加载失败，尝试原始JSON:", error);
+                // 回退到原始JSON文件
+                return fetch(jsonUrl)
+                  .then((response) => {
+                    if (!response.ok)
+                      throw new Error(
+                        "无法加载论文数据: " + response.statusText,
+                      );
+                    return response.json();
+                  })
+                  .then((papers) => {
+                    if (!Array.isArray(papers))
+                      throw new Error("论文数据格式不正确");
+                    return papers;
+                  });
+              });
+          }
+        }
+
+        // 2. 卡片渲染函数
+        function renderPapersCards(container, papers) {
+          container.innerHTML = "";
+
+          if (papers.length === 0) {
+            container.innerHTML = `<div style='grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;'>没有找到符合条件的论文</div>`;
+            return;
+          }
+
+          papers.forEach((paper, index) => {
+            const card = document.createElement("div");
+            card.className = `paper-card ${readPapers.has(index) ? "read" : ""}`;
+            card.dataset.index = index;
+
+            // 标题
+            const title = document.createElement("h3");
+            title.className = "paper-title";
+            title.textContent = paper.title || "无标题";
+            card.appendChild(title);
+
+            // 翻译标题
+            if (paper.title_translation) {
+              const translation = document.createElement("div");
+              translation.className = "paper-translation";
+              translation.textContent = paper.title_translation;
+              card.appendChild(translation);
+            }
+
+            // 元信息
+            const meta = document.createElement("div");
+            meta.className = "paper-meta";
+
+            if (paper.journal) {
+              const journal = document.createElement("span");
+              journal.textContent = paper.journal;
+              meta.appendChild(journal);
+            }
+
+            if (paper.date) {
+              const date = document.createElement("span");
+              date.textContent = paper.date;
+              meta.appendChild(date);
+            }
+
+            if (paper.source) {
+              const source = document.createElement("span");
+              source.textContent = paper.source;
+              meta.appendChild(source);
+            }
+
+            card.appendChild(meta);
+
+            // 作者
+            if (
+              paper.authors &&
+              Array.isArray(paper.authors) &&
+              paper.authors.length > 0
+            ) {
+              const authors = document.createElement("div");
+              authors.className = "paper-authors";
+              authors.style.fontSize = "14px";
+              authors.style.color = "#666";
+              authors.style.marginBottom = "12px";
+              authors.textContent = `作者: ${paper.authors.join(", ")}`;
+              card.appendChild(authors);
+            }
+
+            // AI分析部分
+            if (paper.ai) {
+              // 关键词
+              if (
+                paper.ai.keywords &&
+                Array.isArray(paper.ai.keywords) &&
+                paper.ai.keywords.length > 0
+              ) {
+                const keywordsContainer = document.createElement("div");
+                keywordsContainer.className = "paper-keywords";
+
+                paper.ai.keywords.forEach((keyword) => {
+                  const keywordTag = document.createElement("span");
+                  keywordTag.className = "keyword-tag";
+                  keywordTag.textContent = keyword;
+                  keywordsContainer.appendChild(keywordTag);
+                });
+
+                card.appendChild(keywordsContainer);
+              }
+
+              // TLDR
+              if (paper.ai.TLDR) {
+                const tldr = document.createElement("div");
+                tldr.className = "paper-tldr";
+                // tldr.style.backgroundColor = '#e8f5e8';
+                tldr.style.padding = "12px";
+                tldr.style.borderRadius = "6px";
+                tldr.style.marginTop = "12px";
+                tldr.style.fontSize = "14px";
+                tldr.innerHTML = `<strong>简要总结:</strong> ${paper.ai.TLDR}`;
+                card.appendChild(tldr);
+              }
+            }
+
+            // 添加点击事件
+            card.addEventListener("click", () => {
+              displayDetails(paper, index);
+              readPapers.add(index);
+              card.classList.add("read");
+              localStorage.setItem(
+                "readPapers",
+                JSON.stringify(Array.from(readPapers)),
+              );
+            });
+
+            container.appendChild(card);
+          });
+        }
+
+        // 3. 显示详情函数
+        function displayDetails(paper, index) {
+          modalDetails.innerHTML = `
+                    <h2><a href="${paper.url || "#"}\" target="_blank\" rel=\"noopener\">${paper.title || "无标题"}</a></h2>
+                    <p><strong>期刊/日期/作者:</strong> ${paper.journal || "未知"} · ${paper.date || "未知"} · ${paper.authors ? (Array.isArray(paper.authors) ? (paper.authors.length > 0 ? paper.authors.join(", ") : "未知") : typeof paper.authors === "string" ? paper.authors : "未知") : "未知"}</p>
+                    <p>
+                        ${paper.doi ? `<strong>DOI:</strong> <a href=\"https://doi.org/${paper.doi}\" target=\"_blank\" rel=\"noopener\">${paper.doi}</a>` : ""}
+                        ${paper.doi && paper.pdf_link ? ` · ` : ""}
+                        ${paper.pdf_link ? `<strong>PDF:</strong> <a href=\"${paper.pdf_link}\" target=\"_blank\" rel=\"noopener\">查看</a>` : ""}
+                    </p>
+                    ${paper.ai?.keywords && Array.isArray(paper.ai.keywords) ? `<div class=\"keywords\"><strong>关键词:</strong> ${paper.ai.keywords.map((keyword) => `<span class=\"keyword\">${keyword}</span>`).join("")}</div>` : ""}
+                    ${paper.ai?.TLDR ? `<p><strong>简要总结:</strong> ${paper.ai.TLDR}</p>` : ""}
+                    ${paper.ai?.translation ? `<div class=\"paper-translation\"><strong>摘要:</strong>${marked.parse(paper.ai.translation)}</div>` : ""}
+                    ${paper.abstract ? `<div class=\"paper-abstract\"><strong>Abstract:</strong>${marked.parse(paper.abstract)}</div>` : ""}
+                `;
+
+          modal.style.display = "block";
+          document.body.style.overflow = "hidden"; // 防止背景滚动
+        }
+
+        // 4. 提取所有关键词并创建侧边栏标签
+        function populateSidebarTags(papers) {
+          const keywordsMap = new Map();
+
+          papers.forEach((paper) => {
+            if (
+              paper.ai &&
+              paper.ai.keywords &&
+              Array.isArray(paper.ai.keywords)
+            ) {
+              paper.ai.keywords.forEach((keyword) => {
+                if (keyword && keyword.trim()) {
+                  keywordsMap.set(keyword, (keywordsMap.get(keyword) || 0) + 1);
+                }
+              });
+            }
+          });
+
+          // 将关键词按出现频率排序
+          const sortedKeywords = Array.from(keywordsMap.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 100);
+
+          // 清空标签容器
+          sidebarTagsContainer.innerHTML = "";
+
+          // 添加到侧边栏
+          sortedKeywords.forEach(([keyword, count]) => {
+            const tag = document.createElement("div");
+            tag.className = "sidebar-tag-item";
+            tag.innerHTML = `${keyword} <span class="tag-count">${count}</span>`;
+            tag.dataset.keyword = keyword;
+
+            // 如果该标签已被选中，添加active类
+            if (selectedTags.has(keyword)) {
+              tag.classList.add("active");
+            }
+
+            // 添加点击事件
+            tag.addEventListener("click", () => {
+              if (selectedTags.has(keyword)) {
+                selectedTags.delete(keyword);
+                tag.classList.remove("active");
+              } else {
+                selectedTags.add(keyword);
+                tag.classList.add("active");
+              }
+              applyAllFilters();
+            });
+
+            sidebarTagsContainer.appendChild(tag);
+          });
+        }
+
+        // 5. 填充期刊筛选器
+        function populateJournalFilter(papers) {
+          const journals = new Set();
+          papers.forEach((paper) => {
+            if (paper.journal) {
+              journals.add(paper.journal);
+            }
+          });
+
+          // 将期刊按字母顺序排序
+          const sortedJournals = Array.from(journals).sort();
+
+          // 添加到两个期刊筛选器
+          [journalFilterSidebar].forEach((select) => {
+            // 清空现有选项（除了"全部期刊"）
+            select.innerHTML = '<option value="all">全部期刊</option>';
+
+            sortedJournals.forEach((journal) => {
+              const option = document.createElement("option");
+              option.value = journal;
+              option.textContent = journal;
+              select.appendChild(option);
+            });
+          });
+
+          // 创建期刊列表
+          journalList.innerHTML = "";
+          sortedJournals.forEach((journal) => {
+            const item = document.createElement("div");
+            item.style.padding = "8px";
+            item.style.cursor = "pointer";
+            item.style.borderRadius = "4px";
+            item.style.marginBottom = "2px";
+            item.textContent = journal;
+
+            item.addEventListener("click", () => {
+              selectedJournal = journal;
+              journalFilterSidebar.value = journal;
+              applyAllFilters();
+            });
+
+            item.addEventListener("mouseenter", () => {
+              item.style.backgroundColor = "#f0f0f0";
+            });
+
+            item.addEventListener("mouseleave", () => {
+              item.style.backgroundColor = "transparent";
+            });
+
+            journalList.appendChild(item);
+          });
+        }
+
+        // 6. 时间筛选函数
+        function filterByDate(papers) {
+          const timeValue = currentTimeFilter;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          let startDateValue, endDateValue;
+
+          switch (timeValue) {
+            case "today":
+              startDateValue = new Date(today);
+              endDateValue = new Date(today);
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            case "week":
+              startDateValue = new Date(today);
+              // 计算到上周一的偏移量：如果今天是周日(0)，需要减去6天；其他情况减去(dayOfWeek-1)天
+              const dayOfWeek = today.getDay(); // 0=周日, 1=周一, ..., 6=周六
+              const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+              startDateValue.setDate(today.getDate() - daysToMonday);
+
+              endDateValue = new Date(today);
+              // 计算到本周日的偏移量：如果今天是周日(0)，不需要加；其他情况加上(7-dayOfWeek)天
+              const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+              endDateValue.setDate(today.getDate() + daysToSunday);
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            case "month":
+              startDateValue = new Date(
+                today.getFullYear(),
+                today.getMonth(),
+                1,
+              );
+              endDateValue = new Date(
+                today.getFullYear(),
+                today.getMonth() + 1,
+                0,
+              );
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            case "halfyear":
+              startDateValue = new Date(today);
+              startDateValue.setMonth(today.getMonth() - 6);
+              endDateValue = new Date(today);
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            case "year":
+              startDateValue = new Date(today.getFullYear(), 0, 1);
+              endDateValue = new Date(today.getFullYear(), 11, 31);
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            case "2years":
+              startDateValue = new Date(
+                today.getFullYear() - 2,
+                today.getMonth(),
+                today.getDate(),
+              );
+              endDateValue = new Date(today);
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            case "3years":
+              startDateValue = new Date(
+                today.getFullYear() - 3,
+                today.getMonth(),
+                today.getDate(),
+              );
+              endDateValue = new Date(today);
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            case "5years":
+              startDateValue = new Date(
+                today.getFullYear() - 5,
+                today.getMonth(),
+                today.getDate(),
+              );
+              endDateValue = new Date(today);
+              endDateValue.setHours(23, 59, 59, 999);
+              break;
+            default:
+              return papers;
+          }
+
+          return papers.filter((paper) => {
+            if (!paper.date) return true;
+
+            const paperDateStr = paper.date;
+            let paperDate;
+
+            try {
+              paperDate = new Date(paperDateStr);
+            } catch (e) {
+              return false;
+            }
+
+            return paperDate >= startDateValue && paperDate <= endDateValue;
+          });
+        }
+
+        // 7. 期刊筛选函数
+        function filterByJournal(papers) {
+          if (selectedJournal === "all") return papers;
+          return papers.filter((paper) => paper.journal === selectedJournal);
+        }
+
+        // 8. 关键词标签筛选函数
+        function filterByKeywords(papers) {
+          if (selectedTags.size === 0) return papers;
+
+          return papers.filter((paper) => {
+            if (
+              !paper.ai ||
+              !paper.ai.keywords ||
+              !Array.isArray(paper.ai.keywords)
+            ) {
+              return false;
+            }
+
+            return Array.from(selectedTags).some((tag) =>
+              paper.ai.keywords.includes(tag),
+            );
+          });
+        }
+
+        // 9. 搜索筛选函数
+        function filterBySearch(papers) {
+          const searchTerm = searchInput.value.toLowerCase().trim();
+          if (!searchTerm) return papers;
+
+          return papers.filter((paper) => {
+            const titleMatch =
+              paper.title && paper.title.toLowerCase().includes(searchTerm);
+            const abstractMatch =
+              paper.abstract &&
+              paper.abstract.toLowerCase().includes(searchTerm);
+            const keywordsMatch =
+              paper.ai &&
+              paper.ai.keywords &&
+              Array.isArray(paper.ai.keywords) &&
+              paper.ai.keywords.some((keyword) =>
+                keyword.toLowerCase().includes(searchTerm),
+              );
+
+            return titleMatch || abstractMatch || keywordsMatch;
+          });
+        }
+
+        // 10. 应用所有筛选条件
+        function applyAllFilters() {
+          let filtered = [...allPapers];
+
+          filtered = filterByDate(filtered);
+          filtered = filterByJournal(filtered);
+          filtered = filterByKeywords(filtered);
+          filtered = filterBySearch(filtered);
+
+          filteredPapers = filtered;
+          papersCount.textContent = filtered.length;
+          renderPapersCards(container, filtered);
+        }
+
+        // 11. 事件监听器
+        timeFilterButtons.addEventListener("click", (e) => {
+          if (e.target.classList.contains("time-filter-btn")) {
+            const value = e.target.dataset.value;
+            currentTimeFilter = value;
+
+            document.querySelectorAll(".time-filter-btn").forEach((btn) => {
+              btn.classList.remove("active");
+            });
+            e.target.classList.add("active");
+
+            // 移除不存在的自定义日期显示/隐藏逻辑
+            // if (value === 'custom') {
+            //     customDateRange.style.display = 'block';
+            //     customDateEnd.style.display = 'block';
+            // } else {
+            //     customDateRange.style.display = 'none';
+            //     customDateEnd.style.display = 'none';
+            // }
+
+            applyAllFilters();
+          }
+        });
+
+        // 移除不存在的日期输入框事件监听器
+        // startDate.addEventListener('change', applyAllFilters);
+        // endDate.addEventListener('change', applyAllFilters);
+        searchInput.addEventListener("input", applyAllFilters);
+
+        // 初始化
+        loadPapersData("data/llm_output.json")
+          .then((papers) => {
+            allPapers = papers;
+            filteredPapers = papers;
+            papersCount.textContent = papers.length;
+            populateJournalFilter(papers);
+            populateSidebarTags(papers);
+            renderPapersCards(container, papers);
+          })
+          .catch((error) => {
+            console.error("加载论文时出错:", error);
+            container.innerHTML = `<div style='grid-column: 1 / -1; text-align: center; padding: 40px; color: #d93025;'>加载论文失败: ${error.message}</div>`;
+          });
+      });
+    </script>
+  </body>
+</html>
