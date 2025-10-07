@@ -1,296 +1,318 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>wideread</title>
-
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- 添加pako库用于GZIP解压缩 -->
+    <title>WideRead - 论文阅读平台</title>
+    <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-
     <style>
-      * {
+      /* 响应式布局 */
+      @media (max-width: 992px) {
+        .sidebar-container {
+          position: fixed;
+          top: 0;
+          left: -300px;
+          width: 280px;
+          height: 100%;
+          background: white;
+          box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+          transition: left 0.3s ease;
+          z-index: 1000;
+          overflow-y: auto;
+        }
+
+        .sidebar-container.active {
+          left: 0;
+        }
+
+        .main-content {
+          margin-left: 0;
+          padding: 10px;
+        }
+
+        .filter-container {
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .filter-row {
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .search-container {
+          width: 100%;
+        }
+
+        .filter-group {
+          width: 100%;
+        }
+
+        .time-filter-buttons {
+          flex-wrap: wrap;
+          justify-content: flex-start;
+        }
+
+        .time-filter-btn {
+          margin: 2px;
+        }
+
+        .filter-stats {
+          width: 100%;
+          text-align: center;
+        }
+
+        .paper-card {
+          padding: 12px;
+        }
+
+        .paper-meta span {
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .paper-keywords {
+          gap: 4px;
+        }
+
+        .keyword-tag {
+          font-size: 12px;
+          padding: 2px 6px;
+        }
+
+        .modal-content {
+          width: 95%;
+          max-height: 95vh;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .sidebar-container {
+          width: 100%;
+          left: -100%;
+        }
+
+        .paper-card {
+          padding: 10px;
+        }
+
+        .paper-title {
+          font-size: 16px;
+        }
+
+        .paper-translation {
+          font-size: 14px;
+        }
+
+        .paper-authors {
+          font-size: 12px;
+        }
+
+        .paper-keywords {
+          flex-wrap: wrap;
+        }
+
+        .keyword-tag {
+          font-size: 11px;
+          padding: 2px 5px;
+        }
+
+        .paper-tldr {
+          font-size: 12px;
+          padding: 8px;
+        }
+      }
+
+      /* 基础样式 */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
         margin: 0;
         padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background-color: #f5f5f5;
-        transition: padding-left 0.3s ease;
-        padding-left: 60px; /* 为侧边栏图标留出空间 */
+        color: #333;
       }
 
-      .app-container {
+      .header {
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 16px 20px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 24px;
+        color: #202124;
+      }
+
+      .layout-container {
         display: flex;
-        min-height: 100vh;
+        min-height: calc(100vh - 60px);
       }
 
+      /* 侧边栏容器 */
       .sidebar-container {
-        position: fixed;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
+        width: 300px;
+        background: white;
+        border-right: 1px solid #e0e0e0;
+        padding: 20px;
+        overflow-y: auto;
+        flex-shrink: 0;
       }
 
-      .sidebar-icon {
-        width: 50px;
-        height: 50px;
-        background-color: #1976d2;
-        color: white;
-        border-radius: 0 8px 8px 0;
+      .sidebar-header {
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        justify-content: center;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .sidebar-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: #202124;
+      }
+
+      .reset-btn {
+        background: #f1f3f4;
+        border: none;
+        border-radius: 4px;
+        padding: 6px 12px;
         cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
-        position: relative;
+        font-size: 14px;
+        color: #5f6368;
       }
 
-      .sidebar-icon:hover {
-        background-color: #1565c0;
-        transform: translateX(5px);
-      }
-
-      .tags-sidebar {
-        position: fixed;
-        left: -400px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 380px;
-        max-height: 70vh;
-        background-color: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        padding: 20px;
-        transition: left 0.3s ease;
-        z-index: 999;
-        overflow-y: auto;
-      }
-
-      .tags-sidebar.active {
-        left: 70px;
-      }
-
-      .journal-sidebar {
-        position: fixed;
-        left: -400px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 350px;
-        max-height: 60vh;
-        background-color: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        padding: 20px;
-        transition: left 0.3s ease;
-        z-index: 998;
-        overflow-y: auto;
-      }
-
-      .journal-sidebar.active {
-        left: 70px;
-      }
-
-      /* 来源侧边栏样式 */
-      .source-sidebar {
-        position: fixed;
-        left: -400px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 350px;
-        max-height: 60vh;
-        background-color: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        padding: 20px;
-        transition: left 0.3s ease;
-        z-index: 997;
-        overflow-y: auto;
-      }
-
-      .source-sidebar.active {
-        left: 70px;
+      .reset-btn:hover {
+        background: #e8eaed;
       }
 
       .sidebar-tags {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         gap: 8px;
-        margin-top: 15px;
       }
 
       .sidebar-tag-item {
-        flex: 0 0 calc(33.333% - 6px); /* 每行3个 */
-        background-color: #f0f0f0;
-        padding: 6px 8px;
+        padding: 8px 12px;
+        background: #f1f3f4;
         border-radius: 16px;
         cursor: pointer;
-        transition: all 0.2s ease;
-        font-size: 11px;
+        font-size: 14px;
+        transition: all 0.2s;
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        min-height: 26px;
+        align-items: center;
       }
 
       .sidebar-tag-item:hover {
-        background-color: #e0e0e0;
+        background: #e8eaed;
       }
 
       .sidebar-tag-item.active {
-        background-color: #1976d2;
+        background: #1a73e8;
         color: white;
       }
 
       .tag-count {
-        font-size: 10px;
-        opacity: 0.7;
-        margin-left: 4px;
+        font-size: 12px;
+        background: rgba(0, 0, 0, 0.1);
+        padding: 2px 6px;
+        border-radius: 10px;
       }
 
+      .sidebar-tag-item.active .tag-count {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      /* 主要内容区域 */
       .main-content {
         flex: 1;
         padding: 20px;
-        max-width: 1600px;
-        margin: 0 auto;
+        overflow-y: auto;
       }
 
       .filter-container {
-        background-color: white;
-        border-radius: 6px;
-        padding: 12px 16px;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      .filter-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
       }
 
       .search-container {
-        margin-bottom: 0;
         flex: 1;
         min-width: 200px;
       }
 
       .search-input {
         width: 100%;
-        padding: 8px 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        font-size: 14px;
-        transition: border-color 0.2s ease;
+        padding: 10px 16px;
+        border: 1px solid #dfe1e5;
+        border-radius: 24px;
+        font-size: 16px;
+        outline: none;
+        transition: box-shadow 0.2s;
       }
 
       .search-input:focus {
-        outline: none;
-        border-color: #1976d2;
-      }
-
-      .filter-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: center;
-        justify-content: space-between;
+        box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+        border-color: rgba(223, 225, 229, 0);
       }
 
       .filter-group {
         display: flex;
-        flex-direction: row;
         align-items: center;
-        gap: 6px;
-      }
-
-      .filter-group label {
-        font-weight: 500;
-        color: #333;
-        font-size: 13px;
-        margin: 0;
-        white-space: nowrap;
+        gap: 8px;
       }
 
       .time-filter-buttons {
         display: flex;
+        gap: 8px;
         flex-wrap: wrap;
-        gap: 4px;
       }
 
       .time-filter-btn {
-        padding: 4px 8px;
-        border: 1px solid #e0e0e0;
-        background-color: white;
-        border-radius: 4px;
+        padding: 6px 12px;
+        border: 1px solid #dadce0;
+        background: white;
+        border-radius: 16px;
         cursor: pointer;
-        transition: all 0.2s ease;
-        font-size: 12px;
+        font-size: 14px;
+        transition: all 0.2s;
       }
 
       .time-filter-btn:hover {
-        background-color: #f5f5f5;
+        background: #f8f9fa;
+        border-color: #d2e3fc;
       }
 
       .time-filter-btn.active {
-        background-color: #1976d2;
+        background: #1a73e8;
         color: white;
-        border-color: #1976d2;
-      }
-
-      select {
-        padding: 4px 6px;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        background-color: white;
-        font-size: 12px;
-      }
-
-      .filter-buttons {
-        display: flex;
-        gap: 6px;
-      }
-
-      .filter-btn {
-        padding: 4px 8px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        font-size: 12px;
-        font-weight: 500;
-      }
-
-      .filter-btn:not(.secondary) {
-        background-color: #1976d2;
-        color: white;
-      }
-
-      .filter-btn:not(.secondary):hover {
-        background-color: #1565c0;
-      }
-
-      .filter-btn.secondary {
-        background-color: #f0f0f0;
-        color: #333;
-      }
-
-      .filter-btn.secondary:hover {
-        background-color: #e0e0e0;
+        border-color: #1a73e8;
       }
 
       .filter-stats {
-        margin: 0;
-        padding: 0;
-        border: none;
-        color: #666;
-        font-size: 12px;
+        font-size: 14px;
+        color: #5f6368;
         white-space: nowrap;
       }
 
+      /* 论文卡片 */
       .container {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -298,17 +320,17 @@
       }
 
       .paper-card {
-        background-color: white;
+        background: white;
         border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        transition: all 0.2s ease;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         cursor: pointer;
-        border: 1px solid transparent;
+        transition: all 0.2s;
+        position: relative;
       }
 
       .paper-card:hover {
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         transform: translateY(-2px);
       }
 
@@ -316,236 +338,114 @@
         opacity: 0.7;
       }
 
+      .paper-card.read::before {
+        content: "✓";
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: #34a853;
+        font-weight: bold;
+      }
+
       .paper-title {
-        font-size: 16px;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 12px;
-        line-height: 1.4;
+        margin: 0 0 8px 0;
+        font-size: 18px;
+        font-weight: 500;
+        color: #1a0dab;
+        line-height: 1.3;
       }
 
       .paper-translation {
-        font-size: 14px;
-        color: #666;
-        margin-bottom: 12px;
-        font-style: italic;
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        color: #5f6368;
+        line-height: 1.4;
       }
 
       .paper-meta {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        gap: 12px;
         margin-bottom: 12px;
-        font-size: 14px;
-        color: #666;
+        font-size: 13px;
+        color: #5f6368;
       }
 
       .paper-meta span {
-        background-color: #f0f0f0;
-        padding: 4px 8px;
-        border-radius: 4px;
+        display: flex;
+        align-items: center;
+      }
+
+      .paper-meta span:not(:last-child)::after {
+        content: "•";
+        margin-left: 12px;
+      }
+
+      .paper-authors {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: #5f6368;
       }
 
       .paper-keywords {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        margin-top: 12px;
+        margin: 12px 0;
       }
 
       .keyword-tag {
-        background-color: #e3f2fd;
-        color: #1976d2;
-        padding: 4px 8px;
+        background: #e8f0fe;
+        color: #1a73e8;
+        padding: 4px 10px;
         border-radius: 12px;
-        font-size: 12px;
+        font-size: 13px;
+        white-space: nowrap;
       }
 
-      .paper-abstract {
-        margin: 15px 0;
-        padding: 10px;
-        background-color: #f9f9f9;
-        border-radius: 5px;
-        font-size: 14px;
-        color: #555;
-        line-height: 1.6;
-      }
-
-      .modal {
-        display: none;
-        position: fixed;
-        z-index: 2000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-      }
-
-      /* Replace the .modal-content section (lines 550-560) with: */
-      .modal-content {
-        background-color: white;
-        padding: 25px;
-        border-radius: 8px;
-        max-width: 1200px;
-        width: 90%;
-        max-height: 90vh;
-        overflow-y: auto;
-        position: relative;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        margin: 2% auto;
-      }
-
-      /* Replace the .close-btn section (lines 562-570) with: */
-      .close-btn {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        font-size: 20px;
-        cursor: pointer;
-        color: #666;
-        transition: color 0.2s;
-      }
-
-      /* Replace the .paper-abstract section (lines 528-538) with: */
-      .paper-abstract {
-        margin: 15px 0;
-        padding: 10px;
-        background-color: #f9f9f9;
-        border-radius: 5px;
-      }
-
-      /* Update .details h2, .details p, and add .details strong, .details a sections */
-      .details h2 {
-        color: #202124;
-        margin-top: 0;
-        margin-bottom: 15px;
-        font-size: 1.5em;
-      }
-
-      .details p {
-        margin: 10px 0;
-        line-height: 1.6;
-        font-size: 14px;
-      }
-
-      .details strong {
-        color: #202124;
-      }
-
-      .details a {
-        color: #1967d2;
-        text-decoration: none;
-      }
-
-      .details a:hover {
-        text-decoration: underline;
-      }
-
-      .details .meta {
-        margin-bottom: 20px;
-        padding: 15px;
-        background-color: #f5f5f5;
+      .paper-tldr {
+        background: #f8f9fa;
         border-radius: 6px;
+        padding: 12px;
+        margin-top: 12px;
+        font-size: 14px;
+        line-height: 1.5;
       }
 
-      .details .abstract {
-        margin-bottom: 20px;
-        line-height: 1.8;
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #5f6368;
+        font-size: 16px;
       }
 
-      .details .keywords {
-        margin: 12px 0;
-        flex-wrap: wrap;
-        display: flex;
-        gap: 6px;
-      }
-
-      .details .keyword {
-        display: inline-block;
-        margin: 0.05em 0.2em 0.05em 0;
-        padding: 0.05em 0.4em;
-        border-radius: 1em;
-        background-color: #e3f2fd;
-        color: #1976d2;
-        font-size: 0.85em;
-      }
-
-      .details .tldr {
-        background-color: #e8f5e8;
-        padding: 15px;
-        border-radius: 6px;
-        margin-bottom: 20px;
-      }
-
-      .sidebar-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-      }
-
-      .reset-btn {
-        padding: 6px 12px;
-        background-color: #f44336;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-      }
-
-      .reset-btn:hover {
-        background-color: #d32f2f;
-      }
-
-      #custom-date-row {
-        display: flex;
-        flex-direction: row !important;
-        align-items: center;
-        gap: 15px;
-        margin-top: 8px;
-      }
-
-      #custom-date-row .filter-group {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 8px;
-        min-width: auto !important;
-        margin: 0;
-      }
-
-      #custom-date-row input[type="date"] {
-        width: 140px;
-        min-width: 140px;
-      }
-
-      /* 分页样式 */
+      /* 分页控件 */
       .pagination {
         display: flex;
         justify-content: center;
-        margin-top: 20px;
-        gap: 5px;
+        gap: 8px;
+        margin-top: 30px;
+        padding: 20px 0;
       }
 
       .page-btn {
-        padding: 8px 12px;
-        border: 1px solid #e0e0e0;
-        background-color: white;
+        padding: 8px 16px;
+        border: 1px solid #dadce0;
+        background: white;
         border-radius: 4px;
         cursor: pointer;
-        transition: all 0.2s ease;
+        font-size: 14px;
+        transition: all 0.2s;
       }
 
-      .page-btn:hover {
-        background-color: #f5f5f5;
+      .page-btn:hover:not(.disabled) {
+        background: #f8f9fa;
+        border-color: #d2e3fc;
       }
 
       .page-btn.active {
-        background-color: #1976d2;
+        background: #1a73e8;
         color: white;
-        border-color: #1976d2;
+        border-color: #1a73e8;
       }
 
       .page-btn.disabled {
@@ -553,190 +453,254 @@
         cursor: not-allowed;
       }
 
-      .loading {
-        grid-column: 1 / -1;
-        text-align: center;
-        padding: 40px;
-        color: #666;
+      /* 模态框 */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 2000;
+        overflow-y: auto;
       }
 
-      @media (max-width: 992px) {
-        body {
-          padding-left: 0;
-        }
-        .sidebar-container {
-          display: none;
-        }
-        .container {
-          grid-template-columns: repeat(2, 1fr);
-        }
-        .filter-row {
-          flex-direction: column;
-          align-items: stretch;
-        }
-        .filter-group {
-          min-width: 100%;
-        }
-        .time-filter-buttons {
-          justify-content: flex-start;
-        }
+      .modal-content {
+        background: white;
+        margin: 5% auto;
+        padding: 24px;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 800px;
+        position: relative;
+        max-height: 90vh;
+        overflow-y: auto;
       }
 
-      @media (max-width: 600px) {
-        .container {
-          grid-template-columns: 1fr;
-          padding: 10px;
-        }
-        .modal-content {
-          padding: 15px;
-          max-height: 90vh;
-        }
-        .sidebar-tag-item {
-          flex: 0 0 calc(100% - 4px);
-        }
+      .close-btn {
+        position: absolute;
+        top: 16px;
+        right: 24px;
+        font-size: 28px;
+        cursor: pointer;
+        color: #5f6368;
+      }
+
+      .close-btn:hover {
+        color: #202124;
+      }
+
+      .details h2 {
+        margin: 0 0 16px 0;
+        font-size: 24px;
+        color: #202124;
+      }
+
+      .details h2 a {
+        color: #1a0dab;
+        text-decoration: none;
+      }
+
+      .details h2 a:hover {
+        text-decoration: underline;
+      }
+
+      .details p {
+        margin: 12px 0;
+        line-height: 1.6;
+        color: #202124;
+      }
+
+      .details strong {
+        color: #5f6368;
+      }
+
+      .details a {
+        color: #1a0dab;
+        text-decoration: none;
+      }
+
+      .details a:hover {
+        text-decoration: underline;
+      }
+
+      .details pre {
+        background: #f1f3f4;
+        padding: 16px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .details code {
+        font-family: "Courier New", monospace;
+      }
+
+      .details ul,
+      .details ol {
+        padding-left: 24px;
+        margin: 12px 0;
+      }
+
+      .details li {
+        margin: 8px 0;
+        line-height: 1.5;
+      }
+
+      .details blockquote {
+        border-left: 4px solid #dadce0;
+        padding: 8px 16px;
+        margin: 12px 0;
+        background: #f8f9fa;
+        color: #5f6368;
+      }
+
+      .details img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+        margin: 12px 0;
+      }
+
+      /* 图标区域 */
+      .icons-container {
+        display: flex;
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .icon-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+      }
+
+      .icon-item:hover {
+        background-color: #f1f3f4;
+      }
+
+      .icon-item.active {
+        background-color: #e8f0fe;
+      }
+
+      .icon-item svg {
+        width: 24px;
+        height: 24px;
+        margin-bottom: 4px;
+      }
+
+      .icon-item span {
+        font-size: 12px;
+        color: #5f6368;
       }
     </style>
   </head>
   <body>
-    <!-- 侧边栏图标 -->
-    <div class="sidebar-container">
-      <div class="sidebar-icon" id="tags-icon" title="关键词筛选">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path
-            d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-          ></path>
-        </svg>
-      </div>
-      <div class="sidebar-icon" id="journal-icon" title="期刊筛选">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-        </svg>
-      </div>
-      <!-- 来源筛选图标 -->
-      <div class="sidebar-icon" id="source-icon" title="来源筛选">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-        </svg>
-      </div>
+    <div class="header">
+      <h1>WideRead - 论文阅读平台</h1>
     </div>
 
-    <!-- 关键词侧边栏 -->
-    <div class="tags-sidebar" id="tags-sidebar">
-      <div class="sidebar-header">
-        <h3>关键词筛选</h3>
-        <button class="reset-btn" id="reset-tags">重置</button>
-      </div>
-      <div class="sidebar-tags" id="sidebar-tags-container">
-        <!-- 关键词将通过JavaScript动态添加 -->
-      </div>
-    </div>
-
-    <!-- 期刊侧边栏 -->
-    <div class="journal-sidebar" id="journal-sidebar">
-      <div class="sidebar-header">
-        <h3>期刊筛选</h3>
-        <button class="reset-btn" id="reset-journal">重置</button>
-      </div>
-      <select
-        id="journal-filter-sidebar"
-        style="width: 100%; padding: 8px; margin-bottom: 10px"
-      >
-        <option value="all">全部期刊</option>
-      </select>
-      <div id="journal-list"></div>
-    </div>
-
-    <!-- 来源侧边栏 -->
-    <div class="source-sidebar" id="source-sidebar">
-      <div class="sidebar-header">
-        <h3>来源筛选</h3>
-        <button class="reset-btn" id="reset-source">重置</button>
-      </div>
-      <select
-        id="source-filter-sidebar"
-        style="width: 100%; padding: 8px; margin-bottom: 10px"
-      >
-        <option value="all">全部来源</option>
-      </select>
-      <div id="source-list"></div>
-    </div>
-
-    <!-- 主要内容区域 -->
-    <div class="main-content">
-      <div class="filter-container">
-        <div class="filter-row">
-          <div class="search-container">
-            <input
-              type="text"
-              id="search-input"
-              class="search-input"
-              placeholder="搜索论文标题、关键词或摘要..."
-            />
+    <div class="layout-container">
+      <!-- 侧边栏容器 -->
+      <div class="sidebar-container">
+        <!-- 关键词侧边栏 -->
+        <div class="tags-sidebar" id="tags-sidebar">
+          <div class="sidebar-header">
+            <h3>关键词筛选</h3>
+            <button class="reset-btn" id="reset-tags">重置</button>
           </div>
-          <div class="filter-group">
-            <div class="time-filter-buttons" id="time-filter-buttons">
-              <button class="time-filter-btn active" data-value="all">
-                全部
-              </button>
-              <button class="time-filter-btn" data-value="today">今天</button>
-              <button class="time-filter-btn" data-value="week">本周</button>
-              <button class="time-filter-btn" data-value="month">本月</button>
-              <button class="time-filter-btn" data-value="halfyear">
-                半年
-              </button>
-              <button class="time-filter-btn" data-value="year">今年</button>
-              <button class="time-filter-btn" data-value="2years">2年</button>
-              <button class="time-filter-btn" data-value="3years">3年</button>
-              <button class="time-filter-btn" data-value="5years">5年</button>
-            </div>
+          <div class="sidebar-tags" id="sidebar-tags-container">
+            <!-- 关键词将通过JavaScript动态添加 -->
           </div>
-          <div class="filter-stats">共 <span id="papers-count">0</span> 篇</div>
+        </div>
+
+        <!-- 期刊侧边栏 -->
+        <div class="journal-sidebar" id="journal-sidebar">
+          <div class="sidebar-header">
+            <h3>期刊筛选</h3>
+            <button class="reset-btn" id="reset-journal">重置</button>
+          </div>
+          <input
+            type="text"
+            id="journal-search"
+            class="filter-search"
+            placeholder="搜索期刊..."
+            style="width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;"
+          />
+          <div class="sidebar-tags" id="journal-tags-container">
+            <!-- 期刊标签将通过JavaScript动态添加 -->
+          </div>
+        </div>
+
+        <!-- 来源侧边栏 -->
+        <div class="source-sidebar" id="source-sidebar">
+          <div class="sidebar-header">
+            <h3>来源筛选</h3>
+            <button class="reset-btn" id="reset-source">重置</button>
+          </div>
+          <input
+            type="text"
+            id="source-search"
+            class="filter-search"
+            placeholder="搜索来源..."
+            style="width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;"
+          />
+          <div class="sidebar-tags" id="source-tags-container">
+            <!-- 来源标签将通过JavaScript动态添加 -->
+          </div>
         </div>
       </div>
 
-      <div class="container" id="papers-container"></div>
-      
-      <!-- 分页控件 -->
-      <div class="pagination" id="pagination-container"></div>
-    </div>
+      <!-- 主要内容区域 -->
+      <div class="main-content">
+        <div class="filter-container">
+          <div class="filter-row">
+            <div class="search-container">
+              <input
+                type="text"
+                id="search-input"
+                class="search-input"
+                placeholder="搜索论文标题、关键词或摘要..."
+              />
+            </div>
+            <div class="filter-group">
+              <div class="time-filter-buttons" id="time-filter-buttons">
+                <button class="time-filter-btn active" data-value="all">
+                  全部
+                </button>
+                <button class="time-filter-btn" data-value="today">今天</button>
+                <button class="time-filter-btn" data-value="week">本周</button>
+                <button class="time-filter-btn" data-value="month">本月</button>
+                <button class="time-filter-btn" data-value="halfyear">
+                  半年
+                </button>
+                <button class="time-filter-btn" data-value="year">今年</button>
+                <button class="time-filter-btn" data-value="2years">2年</button>
+                <button class="time-filter-btn" data-value="3years">3年</button>
+                <button class="time-filter-btn" data-value="5years">5年</button>
+              </div>
+            </div>
+            <div class="filter-stats">共 <span id="papers-count">0</span> 篇</div>
+          </div>
+        </div>
 
-    <div class="modal" id="paper-modal">
-      <div class="modal-content">
-        <span class="close-btn" id="close-modal">&times;</span>
-        <div id="modal-details" class="details"></div>
+        <div class="container" id="papers-container"></div>
+        
+        <!-- 分页控件 -->
+        <div class="pagination" id="pagination-container"></div>
+      </div>
+
+      <div class="modal" id="paper-modal">
+        <div class="modal-content">
+          <span class="close-btn" id="close-modal">&times;</span>
+          <div id="modal-details" class="details"></div>
+        </div>
       </div>
     </div>
 
@@ -757,29 +721,25 @@
         const searchInput = document.getElementById("search-input");
         const tagsIcon = document.getElementById("tags-icon");
         const journalIcon = document.getElementById("journal-icon");
-        const sourceIcon = document.getElementById("source-icon"); // 新增来源筛选图标
+        const sourceIcon = document.getElementById("source-icon");
         const tagsSidebar = document.getElementById("tags-sidebar");
         const journalSidebar = document.getElementById("journal-sidebar");
-        const sourceSidebar = document.getElementById("source-sidebar"); // 新增来源侧边栏
+        const sourceSidebar = document.getElementById("source-sidebar");
         const resetTagsBtn = document.getElementById("reset-tags");
         const resetJournalBtn = document.getElementById("reset-journal");
-        const resetSourceBtn = document.getElementById("reset-source"); // 新增重置来源按钮
-        const journalFilterSidebar = document.getElementById(
-          "journal-filter-sidebar",
-        );
-        const sourceFilterSidebar = document.getElementById(
-          "source-filter-sidebar",
-        ); // 新增来源筛选下拉框
-        const journalList = document.getElementById("journal-list");
-        const sourceList = document.getElementById("source-list"); // 新增来源列表
+        const resetSourceBtn = document.getElementById("reset-source");
+        const journalSearch = document.getElementById("journal-search"); // 新增期刊搜索框
+        const sourceSearch = document.getElementById("source-search"); // 新增来源搜索框
+        const journalTagsContainer = document.getElementById("journal-tags-container"); // 新增期刊标签容器
+        const sourceTagsContainer = document.getElementById("source-tags-container"); // 新增来源标签容器
         const paginationContainer = document.getElementById("pagination-container");
 
         let allPapers = [];
         let filteredPapers = [];
         let selectedTags = new Set();
         let currentTimeFilter = "all";
-        let selectedJournal = "all";
-        let selectedSource = "all"; // 新增来源筛选变量
+        let selectedJournals = new Set(); // 修改为Set以支持多选
+        let selectedSources = new Set(); // 修改为Set以支持多选，并统一转为小写存储
         
         // 分页相关变量
         const PAPER_PER_PAGE = 60;
@@ -809,13 +769,13 @@
         tagsIcon.addEventListener("click", () => {
           tagsSidebar.classList.toggle("active");
           journalSidebar.classList.remove("active");
-          sourceSidebar.classList.remove("active"); // 关闭来源侧边栏
+          sourceSidebar.classList.remove("active");
         });
 
         journalIcon.addEventListener("click", () => {
           journalSidebar.classList.toggle("active");
           tagsSidebar.classList.remove("active");
-          sourceSidebar.classList.remove("active"); // 关闭来源侧边栏
+          sourceSidebar.classList.remove("active");
         });
 
         // 来源筛选图标点击事件
@@ -831,11 +791,11 @@
             !e.target.closest(".sidebar-container") &&
             !e.target.closest(".tags-sidebar") &&
             !e.target.closest(".journal-sidebar") &&
-            !e.target.closest(".source-sidebar") // 关闭来源侧边栏
+            !e.target.closest(".source-sidebar")
           ) {
             tagsSidebar.classList.remove("active");
             journalSidebar.classList.remove("active");
-            sourceSidebar.classList.remove("active"); // 关闭来源侧边栏
+            sourceSidebar.classList.remove("active");
           }
         });
 
@@ -850,28 +810,26 @@
 
         // 重置期刊
         resetJournalBtn.addEventListener("click", () => {
-          selectedJournal = "all";
-          journalFilterSidebar.value = "all";
+          selectedJournals.clear();
+          updateJournalTags(); // 更新标签显示
           applyAllFilters();
         });
 
         // 重置来源
         resetSourceBtn.addEventListener("click", () => {
-          selectedSource = "all";
-          sourceFilterSidebar.value = "all";
+          selectedSources.clear();
+          updateSourceTags(); // 更新标签显示
           applyAllFilters();
         });
 
-        // 期刊选择
-        journalFilterSidebar.addEventListener("change", (e) => {
-          selectedJournal = e.target.value;
-          applyAllFilters();
+        // 期刊搜索
+        journalSearch.addEventListener("input", () => {
+          populateJournalFilter(allPapers);
         });
 
-        // 来源选择
-        sourceFilterSidebar.addEventListener("change", (e) => {
-          selectedSource = e.target.value;
-          applyAllFilters();
+        // 来源搜索
+        sourceSearch.addEventListener("input", () => {
+          populateSourceFilter(allPapers);
         });
 
         // 1. 数据加载函数
@@ -1157,15 +1115,14 @@
                     <p><strong>期刊/日期/作者:</strong> ${paper.journal || "未知"} · ${paper.date || "未知"} · ${paper.authors ? (Array.isArray(paper.authors) ? (paper.authors.length > 0 ? paper.authors.join(", ") : "未知") : typeof paper.authors === "string" ? paper.authors : "未知") : "未知"}</p>
                     <p>
                         ${paper.doi ? `<strong>DOI:</strong> <a href=\"https://doi.org/${paper.doi}\" target=\"_blank\" rel=\"noopener\">${paper.doi}</a>` : ""}
-                        ${paper.doi && paper.pdf_link ? ` · ` : ""}
-                        ${paper.pdf_link ? `<strong>PDF:</strong> <a href=\"${paper.pdf_link}\" target=\"_blank\" rel=\"noopener\">查看</a>` : ""}
                     </p>
-                    ${paper.ai?.keywords && Array.isArray(paper.ai.keywords) ? `<div class=\"keywords\"><strong>关键词:</strong> ${paper.ai.keywords.map((keyword) => `<span class=\"keyword\">${keyword}</span>`).join("")}</div>` : ""}
-                    ${paper.ai?.TLDR ? `<p><strong>简要总结:</strong> ${paper.ai.TLDR}</p>` : ""}
-                    ${paper.ai?.translation ? `<div class=\"paper-translation\"><strong>摘要:</strong>${marked.parse(paper.ai.translation)}</div>` : ""}
-                    ${paper.abstract ? `<div class=\"paper-abstract\"><strong>Abstract:</strong>${marked.parse(paper.abstract)}</div>` : ""}
+                    ${paper.abstract ? `<p><strong>摘要:</strong></p><p>${paper.abstract}</p>` : ""}
+                    ${paper.description ? `<p><strong>描述:</strong></p><p>${paper.description}</p>` : ""}
+                    ${paper.title_translation ? `<p><strong>标题翻译:</strong></p><p>${paper.title_translation}</p>` : ""}
+                    ${paper.ai?.translation ? `<p><strong>摘要翻译:</strong></p><p>${paper.ai.translation}</p>` : ""}
+                    ${paper.ai?.TLDR ? `<p><strong>简要总结:</strong></p><p>${paper.ai.TLDR}</p>` : ""}
+                    ${paper.ai?.keywords && Array.isArray(paper.ai.keywords) && paper.ai.keywords.length > 0 ? `<p><strong>关键词:</strong></p><p>${paper.ai.keywords.join(", ")}</p>` : ""}
                 `;
-
           modal.style.display = "block";
           document.body.style.overflow = "hidden"; // 防止背景滚动
         }
@@ -1236,97 +1193,116 @@
           // 将期刊按字母顺序排序
           const sortedJournals = Array.from(journals).sort();
 
-          // 添加到两个期刊筛选器
-          [journalFilterSidebar].forEach((select) => {
-            // 清空现有选项（除了"全部期刊"）
-            select.innerHTML = '<option value="all">全部期刊</option>';
+          // 获取搜索关键词
+          const searchTerm = journalSearch.value.toLowerCase().trim();
 
-            sortedJournals.forEach((journal) => {
-              const option = document.createElement("option");
-              option.value = journal;
-              option.textContent = journal;
-              select.appendChild(option);
-            });
-          });
+          // 清空标签容器
+          journalTagsContainer.innerHTML = "";
 
-          // 创建期刊列表
-          journalList.innerHTML = "";
+          // 添加期刊标签到侧边栏
           sortedJournals.forEach((journal) => {
-            const item = document.createElement("div");
-            item.style.padding = "8px";
-            item.style.cursor = "pointer";
-            item.style.borderRadius = "4px";
-            item.style.marginBottom = "2px";
-            item.textContent = journal;
+            // 如果有搜索词，只显示匹配的期刊
+            if (searchTerm && !journal.toLowerCase().includes(searchTerm)) {
+              return;
+            }
 
-            item.addEventListener("click", () => {
-              selectedJournal = journal;
-              journalFilterSidebar.value = journal;
+            const tag = document.createElement("div");
+            tag.className = "sidebar-tag-item";
+            tag.textContent = journal;
+            tag.dataset.journal = journal;
+
+            // 如果该期刊已被选中，添加active类
+            if (selectedJournals.has(journal)) {
+              tag.classList.add("active");
+            }
+
+            // 添加点击事件
+            tag.addEventListener("click", () => {
+              if (selectedJournals.has(journal)) {
+                selectedJournals.delete(journal);
+                tag.classList.remove("active");
+              } else {
+                selectedJournals.add(journal);
+                tag.classList.add("active");
+              }
               applyAllFilters();
             });
 
-            item.addEventListener("mouseenter", () => {
-              item.style.backgroundColor = "#f0f0f0";
-            });
-
-            item.addEventListener("mouseleave", () => {
-              item.style.backgroundColor = "transparent";
-            });
-
-            journalList.appendChild(item);
+            journalTagsContainer.appendChild(tag);
           });
         }
 
-        // 7. 填充来源筛选器（新功能）
+        // 7. 填充来源筛选器
         function populateSourceFilter(papers) {
           const sources = new Set();
           papers.forEach((paper) => {
             if (paper.source) {
-              sources.add(paper.source);
+              // 统一转为小写存储
+              sources.add(paper.source.toLowerCase());
             }
           });
 
           // 将来源按字母顺序排序
           const sortedSources = Array.from(sources).sort();
 
-          // 添加到来源筛选器
-          [sourceFilterSidebar].forEach((select) => {
-            // 清空现有选项（除了"全部来源"）
-            select.innerHTML = '<option value="all">全部来源</option>';
+          // 获取搜索关键词
+          const searchTerm = sourceSearch.value.toLowerCase().trim();
 
-            sortedSources.forEach((source) => {
-              const option = document.createElement("option");
-              option.value = source;
-              option.textContent = source;
-              select.appendChild(option);
-            });
-          });
+          // 清空标签容器
+          sourceTagsContainer.innerHTML = "";
 
-          // 创建来源列表
-          sourceList.innerHTML = "";
+          // 添加来源标签到侧边栏
           sortedSources.forEach((source) => {
-            const item = document.createElement("div");
-            item.style.padding = "8px";
-            item.style.cursor = "pointer";
-            item.style.borderRadius = "4px";
-            item.style.marginBottom = "2px";
-            item.textContent = source;
+            // 如果有搜索词，只显示匹配的来源
+            if (searchTerm && !source.toLowerCase().includes(searchTerm)) {
+              return;
+            }
 
-            item.addEventListener("click", () => {
-              selectedSource = source;
-              sourceFilterSidebar.value = source;
+            const tag = document.createElement("div");
+            tag.className = "sidebar-tag-item";
+            tag.textContent = source;
+            tag.dataset.source = source;
+
+            // 如果该来源已被选中，添加active类
+            if (selectedSources.has(source)) {
+              tag.classList.add("active");
+            }
+
+            // 添加点击事件
+            tag.addEventListener("click", () => {
+              if (selectedSources.has(source)) {
+                selectedSources.delete(source);
+                tag.classList.remove("active");
+              } else {
+                selectedSources.add(source);
+                tag.classList.add("active");
+              }
               applyAllFilters();
             });
 
-            item.addEventListener("mouseenter", () => {
-              item.style.backgroundColor = "#f0f0f0";
-            });
+            sourceTagsContainer.appendChild(tag);
+          });
+        }
 
-            item.addEventListener("mouseleave", () => {
-              item.style.backgroundColor = "transparent";
-            });
+        // 更新期刊标签显示
+        function updateJournalTags() {
+          document.querySelectorAll("#journal-tags-container .sidebar-tag-item").forEach((tag) => {
+            if (selectedJournals.has(tag.dataset.journal)) {
+              tag.classList.add("active");
+            } else {
+              tag.classList.remove("active");
+            }
+          });
+        }
 
-            sourceList.appendChild(item);
+        // 更新来源标签显示
+        function updateSourceTags() {
+          document.querySelectorAll("#source-tags-container .sidebar-tag-item").forEach((tag) => {
+            if (selectedSources.has(tag.dataset.source)) {
+              tag.classList.add("active");
+            } else {
+              tag.classList.remove("active");
+            }
           });
         }
 
@@ -1428,16 +1404,22 @@
           });
         }
 
-        // 9. 期刊筛选函数
+        // 9. 期刊筛选函数（支持多选）
         function filterByJournal(papers) {
-          if (selectedJournal === "all") return papers;
-          return papers.filter((paper) => paper.journal === selectedJournal);
+          // 如果没有选择任何期刊，返回所有论文
+          if (selectedJournals.size === 0) return papers;
+          
+          // 返回包含任一选中期刊的论文
+          return papers.filter((paper) => selectedJournals.has(paper.journal));
         }
 
-        // 10. 来源筛选函数（新功能）
+        // 10. 来源筛选函数（支持多选和小写转换）
         function filterBySource(papers) {
-          if (selectedSource === "all") return papers;
-          return papers.filter((paper) => paper.source === selectedSource);
+          // 如果没有选择任何来源，返回所有论文
+          if (selectedSources.size === 0) return papers;
+          
+          // 返回包含任一选中来源的论文（注意：论文中的来源需要转为小写进行比较）
+          return papers.filter((paper) => paper.source && selectedSources.has(paper.source.toLowerCase()));
         }
 
         // 11. 关键词标签筛选函数
@@ -1550,7 +1532,7 @@
             papersCount.textContent = papers.length;
             populateJournalFilter(papers);
             populateSidebarTags(papers);
-            populateSourceFilter(papers); // 初始化来源筛选器
+            populateSourceFilter(papers);
             renderPapersCards(container, papers, currentPage);
           })
           .catch((error) => {
