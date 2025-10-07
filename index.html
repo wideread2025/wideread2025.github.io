@@ -619,6 +619,13 @@
         <h3>关键词筛选</h3>
         <button class="reset-btn" id="reset-tags">重置</button>
       </div>
+      <!-- 添加关键词搜索框 -->
+      <input
+        type="text"
+        id="tags-search"
+        class="filter-search"
+        placeholder="搜索关键词..."
+      />
       <div class="sidebar-tags" id="sidebar-tags-container">
         <!-- 关键词将通过JavaScript动态添加 -->
       </div>
@@ -722,6 +729,8 @@
         const journalTagsContainer = document.getElementById("journal-tags-container"); // 期刊标签容器
         const sourceTagsContainer = document.getElementById("source-tags-container"); // 来源标签容器
         const paginationContainer = document.getElementById("pagination-container");
+        // 关键词搜索框
+        const tagsSearch = document.getElementById("tags-search");
 
         let allPapers = [];
         let filteredPapers = [];
@@ -785,6 +794,8 @@
         // 重置关键词
         resetTagsBtn.addEventListener("click", () => {
           selectedTags.clear();
+          tagsSearch.value = ""; // 清除搜索框中的文字
+          populateSidebarTags(allPapers); // 重新填充关键词标签
           document.querySelectorAll(".sidebar-tag-item").forEach((tag) => {
             tag.classList.remove("active");
           });
@@ -804,6 +815,11 @@
           selectedSources.clear();
           updateSourceTags(); // 更新来源标签显示
           applyAllFilters();
+        });
+
+        // 关键词搜索功能
+        tagsSearch.addEventListener("input", () => {
+          populateSidebarTags(allPapers); // 重新填充关键词标签，会根据搜索词过滤
         });
 
         // 期刊搜索功能
@@ -1107,7 +1123,7 @@
           document.body.style.overflow = "hidden"; // 防止背景滚动
         }
 
-        // 5. 提取所有关键词并创建侧边栏标签
+        // 5. 提取所有关键词并创建侧边栏标签（支持搜索和多选）
         function populateSidebarTags(papers) {
           const keywordsMap = new Map();
 
@@ -1128,13 +1144,24 @@
           // 将关键词按出现频率排序
           const sortedKeywords = Array.from(keywordsMap.entries())
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 100);
+            .slice(0, 300);
+
+          // 获取搜索词
+          const searchTerm = tagsSearch.value.toLowerCase().trim();
+          
+          // 过滤关键词（如果存在搜索词）
+          let filteredKeywords = sortedKeywords;
+          if (searchTerm) {
+            filteredKeywords = filteredKeywords.filter(([keyword, count]) => 
+              keyword.toLowerCase().includes(searchTerm)
+            );
+          }
 
           // 清空标签容器
           sidebarTagsContainer.innerHTML = "";
 
           // 添加到侧边栏
-          sortedKeywords.forEach(([keyword, count]) => {
+          filteredKeywords.forEach(([keyword, count]) => {
             const tag = document.createElement("div");
             tag.className = "sidebar-tag-item";
             tag.innerHTML = `${keyword} <span class="tag-count">${count}</span>`;
