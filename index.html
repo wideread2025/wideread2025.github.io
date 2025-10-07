@@ -1018,7 +1018,7 @@ document.body.style.overflow = "auto";
           prevBtn.className = `page-btn ${currentPage === 1 ? "disabled" : ""}`;
           prevBtn.textContent = "上一页";
           prevBtn.disabled = currentPage === 1;
-          prevBtn.addEventListener("click", () => {
+prevBtn.addEventListener("click", () => {
             if (currentPage > 1) {
               renderPapersCards(container, filteredPapers, currentPage - 1);
             }
@@ -1320,11 +1320,31 @@ document.body.style.overflow = "auto";
           if (!searchTerm) return papers;
 
           return papers.filter((paper) => {
+            // 搜索标题
             const titleMatch =
               paper.title && paper.title.toLowerCase().includes(searchTerm);
+            
+            // 搜索摘要
             const abstractMatch =
               paper.abstract &&
               paper.abstract.toLowerCase().includes(searchTerm);
+            
+            // 搜索描述
+            const descriptionMatch =
+              paper.description &&
+              paper.description.toLowerCase().includes(searchTerm);
+            
+            // 搜索AI信息中的TLDR
+            const tldrMatch =
+              paper.ai?.TLDR &&
+              paper.ai.TLDR.toLowerCase().includes(searchTerm);
+            
+            // 搜索AI信息中的翻译
+            const translationMatch =
+              paper.ai?.translation &&
+              paper.ai.translation.toLowerCase().includes(searchTerm);
+            
+            // 搜索关键词
             const keywordsMatch =
               paper.ai &&
               paper.ai.keywords &&
@@ -1333,7 +1353,7 @@ document.body.style.overflow = "auto";
                 keyword.toLowerCase().includes(searchTerm),
               );
 
-            return titleMatch || abstractMatch || keywordsMatch;
+            return titleMatch || abstractMatch || descriptionMatch || tldrMatch || translationMatch || keywordsMatch;
           });
         }
 
