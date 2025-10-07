@@ -500,6 +500,45 @@
         min-width: 140px;
       }
 
+      /* 分页样式 */
+      .pagination {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+        gap: 5px;
+      }
+
+      .page-btn {
+        padding: 8px 12px;
+        border: 1px solid #e0e0e0;
+        background-color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .page-btn:hover {
+        background-color: #f5f5f5;
+      }
+
+      .page-btn.active {
+        background-color: #1976d2;
+        color: white;
+        border-color: #1976d2;
+      }
+
+      .page-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .loading {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+
       @media (max-width: 992px) {
         body {
           padding-left: 0;
@@ -635,6 +674,9 @@
       </div>
 
       <div class="container" id="papers-container"></div>
+      
+      <!-- 分页控件 -->
+      <div class="pagination" id="pagination-container"></div>
     </div>
 
     <div class="modal" id="paper-modal">
@@ -654,12 +696,6 @@
         const timeFilterButtons = document.getElementById(
           "time-filter-buttons",
         );
-        // 移除不存在的DOM元素引用
-        // const customDateRange = document.getElementById('custom-date-range');
-        // const customDateEnd = document.getElementById('custom-date-end');
-        // const customDateRow = document.getElementById('custom-date-row');
-        // const startDate = document.getElementById('start-date');
-        // const endDate = document.getElementById('end-date');
         const sidebarTagsContainer = document.getElementById(
           "sidebar-tags-container",
         );
@@ -675,12 +711,17 @@
           "journal-filter-sidebar",
         );
         const journalList = document.getElementById("journal-list");
+        const paginationContainer = document.getElementById("pagination-container");
 
         let allPapers = [];
         let filteredPapers = [];
         let selectedTags = new Set();
         let currentTimeFilter = "all";
         let selectedJournal = "all";
+        
+        // 分页相关变量
+        const PAPER_PER_PAGE = 60;
+        let currentPage = 1;
 
         // 关闭模态框函数
         function closePaperModal() {
@@ -819,124 +860,187 @@
           }
         }
 
-        // 2. 卡片渲染函数
-        function renderPapersCards(container, papers) {
+        // 2. 卡片渲染函数（分页）
+        function renderPapersCards(container, papers, page = 1) {
           container.innerHTML = "";
-
+          
           if (papers.length === 0) {
-            container.innerHTML = `<div style='grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;'>没有找到符合条件的论文</div>`;
+            container.innerHTML = `<div class="loading">没有找到符合条件的论文</div>`;
+            renderPagination(0, page);
             return;
           }
+          
+          // 计算分页数据
+          const totalPages = Math.ceil(papers.length / PAPER_PER_PAGE);
+          const startIndex = (page - 1) * PAPER_PER_PAGE;
+          const endIndex = Math.min(startIndex + PAPER_PER_PAGE, papers.length);
+          const papersToShow = papers.slice(startIndex, endIndex);
+          
+          // 显示加载中状态
+          container.innerHTML = `<div class="loading">加载中...</div>`;
+          
+          // 使用setTimeout让UI有机会更新显示"加载中"
+          setTimeout(() => {
+            container.innerHTML = "";
+            
+            papersToShow.forEach((paper, index) => {
+              const globalIndex = startIndex + index;
+              const card = document.createElement("div");
+              card.className = `paper-card ${readPapers.has(globalIndex) ? "read" : ""}`;
+              card.dataset.index = globalIndex;
 
-          papers.forEach((paper, index) => {
-            const card = document.createElement("div");
-            card.className = `paper-card ${readPapers.has(index) ? "read" : ""}`;
-            card.dataset.index = index;
+              // 标题
+              const title = document.createElement("h3");
+              title.className = "paper-title";
+              title.textContent = paper.title || "无标题";
+              card.appendChild(title);
 
-            // 标题
-            const title = document.createElement("h3");
-            title.className = "paper-title";
-            title.textContent = paper.title || "无标题";
-            card.appendChild(title);
+              // 翻译标题
+              if (paper.title_translation) {
+                const translation = document.createElement("div");
+                translation.className = "paper-translation";
+                translation.textContent = paper.title_translation;
+                card.appendChild(translation);
+              }
 
-            // 翻译标题
-            if (paper.title_translation) {
-              const translation = document.createElement("div");
-              translation.className = "paper-translation";
-              translation.textContent = paper.title_translation;
-              card.appendChild(translation);
-            }
+              // 元信息
+              const meta = document.createElement("div");
+              meta.className = "paper-meta";
 
-            // 元信息
-            const meta = document.createElement("div");
-            meta.className = "paper-meta";
+              if (paper.journal) {
+                const journal = document.createElement("span");
+                journal.textContent = paper.journal;
+                meta.appendChild(journal);
+              }
 
-            if (paper.journal) {
-              const journal = document.createElement("span");
-              journal.textContent = paper.journal;
-              meta.appendChild(journal);
-            }
+              if (paper.date) {
+                const date = document.createElement("span");
+                date.textContent = paper.date;
+                meta.appendChild(date);
+              }
 
-            if (paper.date) {
-              const date = document.createElement("span");
-              date.textContent = paper.date;
-              meta.appendChild(date);
-            }
+              if (paper.source) {
+                const source = document.createElement("span");
+                source.textContent = paper.source;
+                meta.appendChild(source);
+              }
 
-            if (paper.source) {
-              const source = document.createElement("span");
-              source.textContent = paper.source;
-              meta.appendChild(source);
-            }
+              card.appendChild(meta);
 
-            card.appendChild(meta);
-
-            // 作者
-            if (
-              paper.authors &&
-              Array.isArray(paper.authors) &&
-              paper.authors.length > 0
-            ) {
-              const authors = document.createElement("div");
-              authors.className = "paper-authors";
-              authors.style.fontSize = "14px";
-              authors.style.color = "#666";
-              authors.style.marginBottom = "12px";
-              authors.textContent = `作者: ${paper.authors.join(", ")}`;
-              card.appendChild(authors);
-            }
-
-            // AI分析部分
-            if (paper.ai) {
-              // 关键词
+              // 作者
               if (
-                paper.ai.keywords &&
-                Array.isArray(paper.ai.keywords) &&
-                paper.ai.keywords.length > 0
+                paper.authors &&
+                Array.isArray(paper.authors) &&
+                paper.authors.length > 0
               ) {
-                const keywordsContainer = document.createElement("div");
-                keywordsContainer.className = "paper-keywords";
-
-                paper.ai.keywords.forEach((keyword) => {
-                  const keywordTag = document.createElement("span");
-                  keywordTag.className = "keyword-tag";
-                  keywordTag.textContent = keyword;
-                  keywordsContainer.appendChild(keywordTag);
-                });
-
-                card.appendChild(keywordsContainer);
+                const authors = document.createElement("div");
+                authors.className = "paper-authors";
+                authors.style.fontSize = "14px";
+                authors.style.color = "#666";
+                authors.style.marginBottom = "12px";
+                authors.textContent = `作者: ${paper.authors.join(", ")}`;
+                card.appendChild(authors);
               }
 
-              // TLDR
-              if (paper.ai.TLDR) {
-                const tldr = document.createElement("div");
-                tldr.className = "paper-tldr";
-                // tldr.style.backgroundColor = '#e8f5e8';
-                tldr.style.padding = "12px";
-                tldr.style.borderRadius = "6px";
-                tldr.style.marginTop = "12px";
-                tldr.style.fontSize = "14px";
-                tldr.innerHTML = `<strong>简要总结:</strong> ${paper.ai.TLDR}`;
-                card.appendChild(tldr);
-              }
-            }
+              // AI分析部分
+              if (paper.ai) {
+                // 关键词
+                if (
+                  paper.ai.keywords &&
+                  Array.isArray(paper.ai.keywords) &&
+                  paper.ai.keywords.length > 0
+                ) {
+                  const keywordsContainer = document.createElement("div");
+                  keywordsContainer.className = "paper-keywords";
 
-            // 添加点击事件
-            card.addEventListener("click", () => {
-              displayDetails(paper, index);
-              readPapers.add(index);
-              card.classList.add("read");
-              localStorage.setItem(
-                "readPapers",
-                JSON.stringify(Array.from(readPapers)),
-              );
+                  paper.ai.keywords.forEach((keyword) => {
+                    const keywordTag = document.createElement("span");
+                    keywordTag.className = "keyword-tag";
+                    keywordTag.textContent = keyword;
+                    keywordsContainer.appendChild(keywordTag);
+                  });
+
+                  card.appendChild(keywordsContainer);
+                }
+
+                // TLDR
+                if (paper.ai.TLDR) {
+                  const tldr = document.createElement("div");
+                  tldr.className = "paper-tldr";
+                  tldr.style.padding = "12px";
+                  tldr.style.borderRadius = "6px";
+                  tldr.style.marginTop = "12px";
+                  tldr.style.fontSize = "14px";
+                  tldr.innerHTML = `<strong>简要总结:</strong> ${paper.ai.TLDR}`;
+                  card.appendChild(tldr);
+                }
+              }
+
+              // 添加点击事件
+              card.addEventListener("click", () => {
+                displayDetails(paper, globalIndex);
+                readPapers.add(globalIndex);
+                card.classList.add("read");
+                localStorage.setItem(
+                  "readPapers",
+                  JSON.stringify(Array.from(readPapers)),
+                );
+              });
+
+              container.appendChild(card);
             });
-
-            container.appendChild(card);
-          });
+            
+            // 渲染分页控件
+            renderPagination(totalPages, page);
+          }, 0);
         }
 
-        // 3. 显示详情函数
+        // 3. 渲染分页控件
+        function renderPagination(totalPages, currentPage) {
+          paginationContainer.innerHTML = "";
+          
+          if (totalPages <= 1) return;
+          
+          // 上一页按钮
+          const prevBtn = document.createElement("button");
+          prevBtn.className = `page-btn ${currentPage === 1 ? "disabled" : ""}`;
+          prevBtn.textContent = "上一页";
+          prevBtn.disabled = currentPage === 1;
+          prevBtn.addEventListener("click", () => {
+            if (currentPage > 1) {
+              renderPapersCards(container, filteredPapers, currentPage - 1);
+            }
+          });
+          paginationContainer.appendChild(prevBtn);
+          
+          // 页码按钮
+          const startPage = Math.max(1, currentPage - 2);
+          const endPage = Math.min(totalPages, currentPage + 2);
+          
+          for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement("button");
+            pageBtn.className = `page-btn ${i === currentPage ? "active" : ""}`;
+            pageBtn.textContent = i;
+            pageBtn.addEventListener("click", () => {
+              renderPapersCards(container, filteredPapers, i);
+            });
+            paginationContainer.appendChild(pageBtn);
+          }
+          
+          // 下一页按钮
+          const nextBtn = document.createElement("button");
+          nextBtn.className = `page-btn ${currentPage === totalPages ? "disabled" : ""}`;
+          nextBtn.textContent = "下一页";
+          nextBtn.disabled = currentPage === totalPages;
+          nextBtn.addEventListener("click", () => {
+            if (currentPage < totalPages) {
+              renderPapersCards(container, filteredPapers, currentPage + 1);
+            }
+          });
+          paginationContainer.appendChild(nextBtn);
+        }
+
+        // 4. 显示详情函数
         function displayDetails(paper, index) {
           modalDetails.innerHTML = `
                     <h2><a href="${paper.url || "#"}\" target="_blank\" rel=\"noopener\">${paper.title || "无标题"}</a></h2>
@@ -956,7 +1060,7 @@
           document.body.style.overflow = "hidden"; // 防止背景滚动
         }
 
-        // 4. 提取所有关键词并创建侧边栏标签
+        // 5. 提取所有关键词并创建侧边栏标签
         function populateSidebarTags(papers) {
           const keywordsMap = new Map();
 
@@ -1010,7 +1114,7 @@
           });
         }
 
-        // 5. 填充期刊筛选器
+        // 6. 填充期刊筛选器
         function populateJournalFilter(papers) {
           const journals = new Set();
           papers.forEach((paper) => {
@@ -1063,7 +1167,7 @@
           });
         }
 
-        // 6. 时间筛选函数
+        // 7. 时间筛选函数
         function filterByDate(papers) {
           const timeValue = currentTimeFilter;
           const today = new Date();
@@ -1161,13 +1265,13 @@
           });
         }
 
-        // 7. 期刊筛选函数
+        // 8. 期刊筛选函数
         function filterByJournal(papers) {
           if (selectedJournal === "all") return papers;
           return papers.filter((paper) => paper.journal === selectedJournal);
         }
 
-        // 8. 关键词标签筛选函数
+        // 9. 关键词标签筛选函数
         function filterByKeywords(papers) {
           if (selectedTags.size === 0) return papers;
 
@@ -1186,7 +1290,7 @@
           });
         }
 
-        // 9. 搜索筛选函数
+        // 10. 搜索筛选函数（带防抖）
         function filterBySearch(papers) {
           const searchTerm = searchInput.value.toLowerCase().trim();
           if (!searchTerm) return papers;
@@ -1209,7 +1313,7 @@
           });
         }
 
-        // 10. 应用所有筛选条件
+        // 11. 应用所有筛选条件
         function applyAllFilters() {
           let filtered = [...allPapers];
 
@@ -1220,10 +1324,20 @@
 
           filteredPapers = filtered;
           papersCount.textContent = filtered.length;
-          renderPapersCards(container, filtered);
+          currentPage = 1; // 重置到第一页
+          renderPapersCards(container, filtered, currentPage);
         }
 
-        // 11. 事件监听器
+        // 12. 搜索防抖
+        let searchTimeout;
+        searchInput.addEventListener("input", () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+            applyAllFilters();
+          }, 300); // 300ms防抖
+        });
+
+        // 13. 事件监听器
         timeFilterButtons.addEventListener("click", (e) => {
           if (e.target.classList.contains("time-filter-btn")) {
             const value = e.target.dataset.value;
@@ -1234,23 +1348,9 @@
             });
             e.target.classList.add("active");
 
-            // 移除不存在的自定义日期显示/隐藏逻辑
-            // if (value === 'custom') {
-            //     customDateRange.style.display = 'block';
-            //     customDateEnd.style.display = 'block';
-            // } else {
-            //     customDateRange.style.display = 'none';
-            //     customDateEnd.style.display = 'none';
-            // }
-
             applyAllFilters();
           }
         });
-
-        // 移除不存在的日期输入框事件监听器
-        // startDate.addEventListener('change', applyAllFilters);
-        // endDate.addEventListener('change', applyAllFilters);
-        searchInput.addEventListener("input", applyAllFilters);
 
         // 初始化
         loadPapersData("data/llm_output.json")
@@ -1260,11 +1360,11 @@
             papersCount.textContent = papers.length;
             populateJournalFilter(papers);
             populateSidebarTags(papers);
-            renderPapersCards(container, papers);
+            renderPapersCards(container, papers, currentPage);
           })
           .catch((error) => {
             console.error("加载论文时出错:", error);
-            container.innerHTML = `<div style='grid-column: 1 / -1; text-align: center; padding: 40px; color: #d93025;'>加载论文失败: ${error.message}</div>`;
+            container.innerHTML = `<div class="loading" style='color: #d93025;'>加载论文失败: ${error.message}</div>`;
           });
       });
     </script>
